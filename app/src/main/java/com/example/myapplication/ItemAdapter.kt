@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Adapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.PopupMenu
@@ -12,8 +11,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
-class ItemAdapter(private val itemList: ArrayList<Items>) : RecyclerView.Adapter<ItemAdapter.MyViewHolder>() {
+class ItemAdapter(private val itemList: ArrayList<Items>) :
+    RecyclerView.Adapter<ItemAdapter.MyViewHolder>() {
 
     inner class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
@@ -24,12 +29,14 @@ class ItemAdapter(private val itemList: ArrayList<Items>) : RecyclerView.Adapter
 
         init {
             mMenus.setOnClickListener {
-                popupMenus(itemView.context, adapterPosition,itemView)
+                popupMenus(itemView.context, adapterPosition, itemView)
             }
         }
     }
 
-    private fun popupMenus(context: Context, position: Int,itemView: View) {
+    private fun popupMenus(context: Context, position: Int, itemView: View) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val foodRef = FirebaseDatabase.getInstance().getReference("users/$userId/foodItems")
         val item = itemList[position]
         val popupMenus = PopupMenu(context, itemView)
         popupMenus.inflate(R.menu.show_menu)
@@ -63,11 +70,33 @@ class ItemAdapter(private val itemList: ArrayList<Items>) : RecyclerView.Adapter
                     true
                 }
                 R.id.deleteText -> {
-                    itemList.removeAt(position)
-                    notifyDataSetChanged()
-                    Toast.makeText(context, "Item deleted", Toast.LENGTH_SHORT).show()
+                    foodRef.orderByChild("food").equalTo(item.food)
+                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                for (itemSnapshot in snapshot.children) {
+                                    val itemId = itemSnapshot.key
+                                    foodRef.child(itemId!!).removeValue().addOnSuccessListener {
+                                        itemList.removeAt(position)
+                                        notifyDataSetChanged()
+                                        Toast.makeText(context, "Item deleted", Toast.LENGTH_SHORT)
+                                            .show()
+                                    }.addOnFailureListener {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to delete item",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+
+                            override fun onCancelled(error: DatabaseError) {
+                                // Handle errors here
+                            }
+                        })
                     true
                 }
+
                 else -> true
             }
         }
@@ -96,21 +125,324 @@ class ItemAdapter(private val itemList: ArrayList<Items>) : RecyclerView.Adapter
 }
 
 
+class AccomAdepter(private val itemList: ArrayList<Accomndantions>) :
+    RecyclerView.Adapter<AccomAdepter.MyViewHolder>() {
+
+    inner class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+
+        var food: TextView = itemView.findViewById(R.id.Item)
+        var amount: TextView = itemView.findViewById(R.id.amount)
+        var description: TextView = itemView.findViewById(R.id.description)
+        var mMenus: ImageView = itemView.findViewById(R.id.mMenu)
+
+        init {
+            mMenus.setOnClickListener {
+                popupMenus(itemView.context, adapterPosition, itemView)
+            }
+        }
+    }
+
+    private fun popupMenus(context: Context, position: Int, itemView: View) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val foodRef = FirebaseDatabase.getInstance().getReference("users/$userId/Accomondation")
+        val item = itemList[position]
+        val popupMenus = PopupMenu(context, itemView)
+        popupMenus.inflate(R.menu.show_menu)
+        popupMenus.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.editText -> {
+                    val dialogView = LayoutInflater.from(context).inflate(R.layout.add_item, null)
+                    val nameEt = dialogView.findViewById<EditText>(R.id.foodEt)
+                    val amountEt = dialogView.findViewById<EditText>(R.id.amountEt)
+                    val descriptionEt = dialogView.findViewById<EditText>(R.id.descriptionEt)
+                    nameEt.setText(item.Accomnadation)
+                    amountEt.setText(item.amount)
+                    descriptionEt.setText(item.description)
+
+                    val dialogBuilder = AlertDialog.Builder(context)
+                        .setView(dialogView)
+                        .setPositiveButton("OK") { dialog, _ ->
+                            itemList[position].Accomnadation = nameEt.text.toString()
+                            itemList[position].amount = amountEt.text.toString()
+                            itemList[position].description = descriptionEt.text.toString()
+                            notifyDataSetChanged()
+                            Toast.makeText(context, "Item updated", Toast.LENGTH_SHORT).show()
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Cancel") { dialog, _ ->
+                            dialog.dismiss()
+                        }
+                        .create()
+                    dialogBuilder.show()
+
+                    true
+                }
+                R.id.deleteText -> {
+                    foodRef.orderByChild("food").equalTo(item.Accomnadation)
+                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                for (itemSnapshot in snapshot.children) {
+                                    val itemId = itemSnapshot.key
+                                    foodRef.child(itemId!!).removeValue().addOnSuccessListener {
+                                        itemList.removeAt(position)
+                                        notifyDataSetChanged()
+                                        Toast.makeText(context, "Item deleted", Toast.LENGTH_SHORT)
+                                            .show()
+                                    }.addOnFailureListener {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to delete item",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+
+                            override fun onCancelled(error: DatabaseError) {
+                                // Handle errors here
+                            }
+                        })
+                    true
+                }
+                else -> true
+            }
+        }
+        popupMenus.show()
+        val popup = PopupMenu::class.java.getDeclaredField("mPopup")
+        popup.isAccessible = true
+        val menu = popup.get(popupMenus)
+        menu.javaClass.getDeclaredMethod("setForceShowIcon", Boolean::class.java).invoke(menu, true)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.items, parent, false)
+        return MyViewHolder(itemView)
+    }
+
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+        val currentitem = itemList[position]
+        holder.food.text = currentitem.Accomnadation
+        holder.amount.text = currentitem.amount
+        holder.description.text = currentitem.description
+    }
+
+    override fun getItemCount(): Int {
+        return itemList.size
+    }
+}
 
 
+class EduAdapter(private val itemList: ArrayList<Stetionaries>) :
+    RecyclerView.Adapter<EduAdapter.MyViewHolder>() {
 
+    inner class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
+        var food: TextView = itemView.findViewById(R.id.Item)
+        var amount: TextView = itemView.findViewById(R.id.amount)
+        var description: TextView = itemView.findViewById(R.id.description)
+        var mMenus: ImageView = itemView.findViewById(R.id.mMenu)
 
+        init {
+            mMenus.setOnClickListener {
+                popupMenus(itemView.context, adapterPosition, itemView)
+            }
+        }
+    }
 
+    private fun popupMenus(context: Context, position: Int, itemView: View) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val foodRef = FirebaseDatabase.getInstance().getReference("users/$userId/Stetionaries")
+        val item = itemList[position]
+        val popupMenus = PopupMenu(context, itemView)
+        popupMenus.inflate(R.menu.show_menu)
+        popupMenus.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.editText -> {
+                    val dialogView = LayoutInflater.from(context).inflate(R.layout.add_item, null)
+                    val nameEt = dialogView.findViewById<EditText>(R.id.foodEt)
+                    val amountEt = dialogView.findViewById<EditText>(R.id.amountEt)
+                    val descriptionEt = dialogView.findViewById<EditText>(R.id.descriptionEt)
+                    nameEt.setText(item.Stetionaries)
+                    amountEt.setText(item.amount)
+                    descriptionEt.setText(item.description)
 
+                    val dialogBuilder = AlertDialog.Builder(context)
+                        .setView(dialogView)
+                        .setPositiveButton("OK") { dialog, _ ->
+                            itemList[position].Stetionaries = nameEt.text.toString()
+                            itemList[position].amount = amountEt.text.toString()
+                            itemList[position].description = descriptionEt.text.toString()
+                            notifyDataSetChanged()
+                            Toast.makeText(context, "Item updated", Toast.LENGTH_SHORT).show()
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Cancel") { dialog, _ ->
+                            dialog.dismiss()
+                        }
+                        .create()
+                    dialogBuilder.show()
 
+                    true
+                }
+                R.id.deleteText -> {
+                    foodRef.orderByChild("food").equalTo(item.Stetionaries)
+                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                for (itemSnapshot in snapshot.children) {
+                                    val itemId = itemSnapshot.key
+                                    foodRef.child(itemId!!).removeValue().addOnSuccessListener {
+                                        itemList.removeAt(position)
+                                        notifyDataSetChanged()
+                                        Toast.makeText(context, "Item deleted", Toast.LENGTH_SHORT)
+                                            .show()
+                                    }.addOnFailureListener {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to delete item",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
 
+                            override fun onCancelled(error: DatabaseError) {
+                                // Handle errors here
+                            }
+                        })
+                    true
+                }
+                else -> true
+            }
+        }
+        popupMenus.show()
+        val popup = PopupMenu::class.java.getDeclaredField("mPopup")
+        popup.isAccessible = true
+        val menu = popup.get(popupMenus)
+        menu.javaClass.getDeclaredMethod("setForceShowIcon", Boolean::class.java).invoke(menu, true)
+    }
 
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.items, parent, false)
+        return MyViewHolder(itemView)
+    }
 
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+        val currentitem = itemList[position]
+        holder.food.text = currentitem.Stetionaries
+        holder.amount.text = currentitem.amount
+        holder.description.text = currentitem.description
+    }
 
+    override fun getItemCount(): Int {
+        return itemList.size
+    }
+}
 
+class OtherAdapter(private val itemList: ArrayList<Others>) :
+    RecyclerView.Adapter<OtherAdapter.MyViewHolder>() {
 
+    inner class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
+        var food: TextView = itemView.findViewById(R.id.Item)
+        var amount: TextView = itemView.findViewById(R.id.amount)
+        var description: TextView = itemView.findViewById(R.id.description)
+        var mMenus: ImageView = itemView.findViewById(R.id.mMenu)
+
+        init {
+            mMenus.setOnClickListener {
+                popupMenus(itemView.context, adapterPosition, itemView)
+            }
+        }
+    }
+
+    private fun popupMenus(context: Context, position: Int, itemView: View) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val foodRef = FirebaseDatabase.getInstance().getReference("users/$userId/Other")
+        val item = itemList[position]
+        val popupMenus = PopupMenu(context, itemView)
+        popupMenus.inflate(R.menu.show_menu)
+        popupMenus.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.editText -> {
+                    val dialogView = LayoutInflater.from(context).inflate(R.layout.add_item, null)
+                    val nameEt = dialogView.findViewById<EditText>(R.id.foodEt)
+                    val amountEt = dialogView.findViewById<EditText>(R.id.amountEt)
+                    val descriptionEt = dialogView.findViewById<EditText>(R.id.descriptionEt)
+                    nameEt.setText(item.other)
+                    amountEt.setText(item.amount)
+                    descriptionEt.setText(item.description)
+
+                    val dialogBuilder = AlertDialog.Builder(context)
+                        .setView(dialogView)
+                        .setPositiveButton("OK") { dialog, _ ->
+                            itemList[position].other = nameEt.text.toString()
+                            itemList[position].amount = amountEt.text.toString()
+                            itemList[position].description = descriptionEt.text.toString()
+                            notifyDataSetChanged()
+                            Toast.makeText(context, "Item updated", Toast.LENGTH_SHORT).show()
+                            dialog.dismiss()
+                        }
+                        .setNegativeButton("Cancel") { dialog, _ ->
+                            dialog.dismiss()
+                        }
+                        .create()
+                    dialogBuilder.show()
+
+                    true
+                }
+                R.id.deleteText -> {
+                    foodRef.orderByChild("food").equalTo(item.other)
+                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                for (itemSnapshot in snapshot.children) {
+                                    val itemId = itemSnapshot.key
+                                    foodRef.child(itemId!!).removeValue().addOnSuccessListener {
+                                        itemList.removeAt(position)
+                                        notifyDataSetChanged()
+                                        Toast.makeText(context, "Item deleted", Toast.LENGTH_SHORT)
+                                            .show()
+                                    }.addOnFailureListener {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to delete item",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+
+                            override fun onCancelled(error: DatabaseError) {
+                                // Handle errors here
+                            }
+                        })
+                    true
+                }
+                else -> true
+            }
+        }
+        popupMenus.show()
+        val popup = PopupMenu::class.java.getDeclaredField("mPopup")
+        popup.isAccessible = true
+        val menu = popup.get(popupMenus)
+        menu.javaClass.getDeclaredMethod("setForceShowIcon", Boolean::class.java).invoke(menu, true)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.items, parent, false)
+        return MyViewHolder(itemView)
+    }
+
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+        val currentitem = itemList[position]
+        holder.food.text = currentitem.other
+        holder.amount.text = currentitem.amount
+        holder.description.text = currentitem.description
+    }
+
+    override fun getItemCount(): Int {
+        return itemList.size
+    }
+}
 
 
 //package com.example.myapplication
@@ -203,11 +535,6 @@ class ItemAdapter(private val itemList: ArrayList<Items>) : RecyclerView.Adapter
 //        return itemList.size
 //    }
 //}
-
-
-
-
-
 
 
 //

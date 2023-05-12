@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".ActivityAcomn">
     <TextView
-        android:id="@+id/ExpenceTpoic"
+        android:id="@+id/ExpenceATpoic"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Rs.15800.00"

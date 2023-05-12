@@ -7,7 +7,7 @@
     tools:context=".ActivityOther">
 
     <TextView
-        android:id="@+id/ExpenceTpoic"
+        android:id="@+id/ExpenceOTpoic"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Rs.11785.00"
